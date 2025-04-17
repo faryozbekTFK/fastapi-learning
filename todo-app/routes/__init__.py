@@ -1,2 +1,2 @@
-from .todo import todo as todo_routes
-from .index import index as index_routes
+from .todo import router as todo_routes
+from .index import router as index_routes
