@@ -3,6 +3,7 @@ from psycopg2 import IntegrityError
 from psycopg2.extras import RealDictCursor
 from database.db_connection import get_connection, release_connection
 from pydantic import BaseModel
+import math
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -76,16 +77,35 @@ async def update_user(user_id: int, user: UserUpdate):
 
 
 @router.get('')
-async def get_users():
+async def get_users(with_email: bool = None, page: int = 1, size: int = 2):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, first_name, last_name, email FROM users")
+    base_query = 'SELECT id, first_name, last_name, email FROM users '
+    count_query = 'SELECT COUNT(*) FROM users '
+
+    if with_email is True:
+        condition = "WHERE email IS NOT NULL"
+    elif with_email is False:
+        condition = "WHERE email IS NULL"
+    else:
+        condition = ""
+
+    cursor.execute(count_query + condition)
+    total = cursor.fetchone()['count']
+
+    total_pages = math.ceil(total / size)
+
+    limit = size
+    offset = (page - 1) * size
+
+    cursor.execute(base_query + condition +
+                   " ORDER BY id ASC LIMIT %s OFFSET %s", (limit, offset,))
     users = cursor.fetchall()
 
     cursor.close()
     release_connection(conn)
-    return users
+    return {"page": page, "size": size, "total": total, "total_pages": total_pages, "results": users}
 
 
 @router.get('/{user_id}')
